@@ -130,7 +130,7 @@ Example with K562 chr22 without Hi-C contact data:
 python ${IVEA_HOME}/scripts/get_contact_frequencies.py \
 --enhancers ./output/enhancer_elements.txt \
 --promoters ./output/gene_promoter_elements.txt \
---window 3000000 \
+--window 5000000 \
 --outdir ./output \
 --chromosomes chr22 \
 #--hicdir ./input/HiC/raw \ # Set when using Hi-C contact data.
