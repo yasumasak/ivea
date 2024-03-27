@@ -17,7 +17,7 @@ def parseargs():
     parser.add_argument('--enhancers', required=True, help="File of enhancer elements formatted as enhancer_elements.txt produced by annotate_regulatory_elements.py")
     parser.add_argument('--promoters', required=True, help="File of promoter elements formatted as gene_promoter_elements.txt produced by annotate_regulatory_elements.py")
     parser.add_argument('--outdir', required=True, help="Output directory")
-    parser.add_argument('--window', type=int, default=3000000, help="Make contacts for all candidate elements within this distance of the gene's TSS")
+    parser.add_argument('--window', type=int, default=5000000, help="Make contacts for all candidate elements within this distance of the gene's TSS")
 
     # HiC
     parser.add_argument('--hicdir', default=None, help="HiC directory: [hicdir]/chr*/chr*.*.gz. If not specified, computing contact frequencies from powerlaw only")

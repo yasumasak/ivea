@@ -30,6 +30,7 @@ def df_to_pyranges(df, start_col='start', end_col='end', chr_col='chr', strand_c
     df_pr = df.copy()
     df_pr['Chromosome'] = df[chr_col]
     df_pr['Start'] = df[start_col] - start_slop
+    df_pr['Start'] = df_pr['Start'].where(df_pr['Start'] >=0, 0)
     df_pr['End'] = df[end_col] + end_slop
     if(strand_col is not None):
         df_pr['Strand'] = df[strand_col]
@@ -147,7 +148,14 @@ def add_counts_for_bed(df_orig, bed_file, genome_sizes, feature_bam, directory, 
 def read_bed6(filename, chr=None, sort=False, skip_chr_sorting=True):
     skip = 1 if ("track" in open(filename, "r").readline()) else 0
     col_names = ["chr", "start", "end", "name", "score", "strand"]
-    df = pd.read_table(filename, names=col_names, header=None, skiprows=skip, comment='#')
+    df = pd.read_table(filename, header=None, skiprows=skip, comment='#')
+    n_cols = len(df.columns)
+    if n_cols > 6:
+        df = df.iloc[:, 0:6]
+        df.columns = col_names
+    else:
+        df.columns = col_names[0:n_cols]
+        
     df = df.dropna(axis=1, how='all')  # drop empty columns
     assert df.columns[0] == "chr"
 
@@ -164,7 +172,7 @@ def read_bed6(filename, chr=None, sort=False, skip_chr_sorting=True):
 def get_tss_for_bed(bed):
     assert_bed6(bed)
     tss = bed['start'].copy()
-    tss.loc[bed.loc[:,'strand'] == "-"] = bed.loc[bed.loc[:,'strand'] == "-",'end']
+    tss.loc[bed.loc[:,'strand'] == "-"] = bed.loc[bed.loc[:,'strand'] == "-",'end'] - 1
     return tss
 
 

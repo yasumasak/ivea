@@ -16,7 +16,7 @@ def parseargs(required_args=True):
     parser.add_argument('--epd_motif_file', '-m', required=True, help="promoter_motifs.txt file from EPD.")
     parser.add_argument('--epd_bed_file_2', '-b2', required=False, help="(Optional) Second bed file from EPD.")
     parser.add_argument('--epd_motif_file_2', '-m2', required=False, help="(Optional) Second promoter_motifs.txt file from EPD.")
-    parser.add_argument('--genes', required=True, help="Bed-6 file of gene annotations. Should be the same one used in used in annotate_regulatory_elements.py.")
+    parser.add_argument('--genes', required=True, help="Bed-6 file of gene annotations. Should be the same one used in used in get_regulatory_elements.py.")
     parser.add_argument('--outdir', required=True, help="Directory to write output files to.")
     parser.add_argument('--tss_slop', default=1000, type=int, help="Consider a region within this many bp from a tss as a promoter region.")
 
@@ -41,7 +41,7 @@ def load_epd(epd_bed_file, motif_file):
 def get_gene_info(genes):
 
     # Gene model used in IVEA
-    df_gene = pd.read_csv(genes, sep="\t", header=None)
+    df_gene = read_bed6(genes)
     df_gene.columns = ['chr', 'start', 'end', 'gene_name', 'score', 'strand']
     df_gene['tss'] = get_tss_for_bed(df_gene)
     df_gene['gene_body_length'] = df_gene['end'] - df_gene['start']

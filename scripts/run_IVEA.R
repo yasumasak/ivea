@@ -19,7 +19,7 @@ optlist <- list(
   # Chromatin contact
   make_option('--contacts', action="store", default=NULL, help="File of enhancer-gene contacts. Formatted as 'enhancer-gene_contacts.txt' file produced by 'get_contact_frequency.py'"),
   make_option('--hic_contact_colname', action="store", default=NULL, help="Contact frequency column name in enhancer-gene contacts file. Last column will be analysed if not specified."),
-  make_option('--window', action="store", default=3000000, help="Analyze enhancer-gene pairs with in this distance."),
+  make_option('--window', action="store", default=5000000, help="Analyze enhancer-gene pairs with in this distance."),
 
   # Gene expression
   make_option('--rnas', action="store", default=NULL, help="File of Gene expressions."),
