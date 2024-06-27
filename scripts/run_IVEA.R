@@ -103,8 +103,12 @@ for(chr_region in v_chr_region){
   ls_out <- IVEA::make_summary(ls_x, ls_z)
   out_info <- paste0(opts$outdir,"/predictions_info.",label,".txt")
   out_bedpe <- paste0(opts$outdir,"/predictions_score.",label,".bedpe")
+  out_bed_pro <- paste0(opts$outdir,"/estimates.promoter_activity.",label,".bed")
+  out_bed_enh <- paste0(opts$outdir,"/estimates.enhancer_activity.",label,".bed")
   write.table(ls_out$info_pair, file=out_info, sep="\t", col.names=T, row.names=F, quote=F)
   write.table(ls_out$bedpe_pair, file=out_bedpe, sep="\t", col.names=F, row.names=F, quote=F)
+  write.table(ls_out$bed_pro, file=out_bed_pro, sep="\t", col.names=F, row.names=F, quote=F)
+  write.table(ls_out$bed_enh, file=out_bed_enh, sep="\t", col.names=F, row.names=F, quote=F)
 
   cat("  Elapsed time: ",(proc.time() - t)[3],"\n", sep="")
 }

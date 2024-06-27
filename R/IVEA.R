@@ -389,12 +389,28 @@ make_summary <- function(ls_x, ls_z){
                               g_strand=rep(".", n_pairs))
 
 
+  # Promoter activity in in BED format
+  df_bed_pro <- data.frame(p_chr=ls_x$chr,
+                           p_start=ls_x$gene_tss-1,
+                           p_end=ls_x$gene_tss,
+                           name=ls_x$gene_name,
+                           activity=z_pro_actv)
+
+  # Enhancer activity in BED format
+  mx_enh <- matrix(unlist(strsplit(ls_x$enh_name, split="[:-]")), ncol=3, byrow=T)
+  df_bed_enh <- data.frame(e_chr=mx_enh[, 1],
+                           e_start=mx_enh[, 2],
+                           e_end=mx_enh[, 3],
+                           name=ls_x$enh_name,
+                           activity=z_enh_actv)
+
   # Order by score
   order_score <- order(df_bedpe_pair$score, decreasing=T)
   df_info_pair <- df_info_pair[order_score, ]
   df_bedpe_pair <- df_bedpe_pair[order_score, ]
 
-  return(list(info_pair=df_info_pair, bedpe_pair=df_bedpe_pair))
+  return(list(info_pair=df_info_pair, bedpe_pair=df_bedpe_pair,
+               bed_pro=df_bed_pro, bed_enh=df_bed_enh))
 
 }
 
