@@ -28,11 +28,7 @@ get_openness <- function(lambda, chi, psi, alpha){
   ghyp_inv_o <- sapply(as.data.frame(mx1), exec_Egig_inv_x)
 
   # Parameters for E_openness
-  a_o <- lambda + alpha + 1
-  b_o <- psi / 2
-  c_o <- alpha
-  d_o <- chi / 2
-  mx2 <- matrix(c(ghyp_o, ghyp_inv_o, a_o, b_o, c_o, d_o), nrow=6, byrow=TRUE)
+  mx2 <- matrix(c(ghyp_o, ghyp_inv_o, lambda, chi, psi, alpha), nrow=6, byrow=TRUE)
   # Execute E_openness
   sapply(as.data.frame(mx2), exec_E_openness)
 }
@@ -69,9 +65,9 @@ exec_Egig_inv_x <- function(v){
 #'
 #' Wrapper for `E_openness` to execute through `apply` function family.
 #'
-#' @param v numeric vector in the form `c(o, inv_o, a, b, c, d)`.
+#' @param v numeric vector in the form `c(o, inv_o, lambda, chi, psi, alpha)`.
 #' If both `o` and `inv_o` are valid, do nothing and return the `o` and `inv_o`.
-#' If not, `E_openness` is executed with `a`, `b`, `c`, and `d` as parameters.
+#' If not, `E_openness` is executed with `lambda`, `chi`, `psi`, and `alpha` as parameters.
 #'
 #' @return A list object of the following expected values:
 #'   \describe{
@@ -80,7 +76,7 @@ exec_Egig_inv_x <- function(v){
 #'   }
 exec_E_openness <- function(v){
   if(is.nan(v[1]) | is.nan(v[2]) | is.infinite(v[1]) | is.infinite(v[2]) | is.na(v[1]) | is.na(v[2])){
-    E_openness(a=v[3], b=v[4], c=v[5], d=v[6])
+    E_openness(lambda=v[3], chi=v[4], psi=v[5], alpha=v[6])
   }else{
     list(o=v[1], inv_o=v[2])
   }
@@ -91,19 +87,27 @@ exec_E_openness <- function(v){
 #' Expected values of openness and 1/openness using `stats::integrate` with
 #' their density function described by the product of gamma and inverse-gamma distributions.
 #'
-#' @param a gamma shape parameter.
-#' @param b gamma rate parameter.
-#' @param c inverse-gamma shape parameter.
-#' @param d inverse-gamma rate parameter.
+#' @param lambda numeric vector of GIG parameter lambda.
+#' @param chi numeric vector of GIG parameter chi. Must be positive.
+#' @param psi numeric vector of GIG parameter psi. Must be positive.
+#' @param alpha numeric vector of inverse-gamma shape parameter.
 #'
 #' @return A list object of the following expected values:
 #'   \describe{
 #'     \item{o}{numeric vector of expected opennes.}
 #'     \item{inv_o}{numeric vector of expected 1/openness.}
 #'   }
-E_openness <- function(a, b, c, d){
+#'
+#' @export
+#E_openness <- function(a, b, c, d){
+E_openness <- function(lambda, chi, psi, alpha){
   S <- NULL; E_o <- NULL; E_inv_o <- NULL;
   lower <- 10^-100
+  a <- lambda + alpha + 1 # gamma shape parameter.
+  b <- psi / 2            # gamma rate parameter.
+  c <- alpha              # inverse-gamma shape parameter.
+  d <- chi / 2            # inverse-gamma rate parameter.
+
   upper <- max(ceiling(3 * a / b), sqrt(a / b * d / c))
   # Scaling factor. The density is scaled for stable calculation in stats::integrate.
   sf <- 10^8

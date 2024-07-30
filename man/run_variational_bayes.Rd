@@ -15,6 +15,7 @@ run_variational_bayes(param, ls_x)
 \item{beta_o}{Hyperparameter beta for the gamma prior of openness.}
 \item{alpha_k}{Hyperparameter alpha for the gamma prior of skaler k.}
 \item{beta_k}{Hyperparameter beta for the gamma prior of skaler k.}
+\item{no_le_enh}{use IVEA_nolE model or not.}
 \item{max_iteration}{Maximum iterations in variational inference.}
 \item{stop_criterion}{Stop iteration when all relative change of
 enhancer activities are less than this value.}

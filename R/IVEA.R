@@ -17,6 +17,7 @@
 #'     \item{beta_o}{Hyperparameter beta for the gamma prior of openness.}
 #'     \item{alpha_k}{Hyperparameter alpha for the gamma prior of skaler k.}
 #'     \item{beta_k}{Hyperparameter beta for the gamma prior of skaler k.}
+#'     \item{no_le_enh}{use IVEA_nolE model or not.}
 #'     \item{max_iteration}{Maximum iterations in variational inference.}
 #'     \item{stop_criterion}{Stop iteration when all relative change of
 #'                           enhancer activities are less than this value.}
@@ -76,7 +77,7 @@ run_variational_bayes <- function(param, ls_x){
 
   #------------------------------
   # Make a resultant object with initial values
-  ls_z <- make_initial_z(ls_x, n_iter)
+  ls_z <- make_initial_z(ls_x, n_iter, param$no_le_enh)
 
   #------------------------------
   # Valuables to be updated
@@ -115,7 +116,13 @@ run_variational_bayes <- function(param, ls_x){
     # Update enhancer openness ------------------------------
     # Generalized inverse Gaussian distribution parameters
     lambda_enh <- v_alpha_o_e - v_alpha_enh + ls_x$enh_count
-    chi_enh <- 2 * v_alpha_enh * z_enh_actv / ls_x$enh_rlen
+    if(param$no_le_enh){
+      # IVEA_nolE
+      chi_enh <- 2 * v_alpha_enh * z_enh_actv / 1
+    }else{
+      # IVEA
+      chi_enh <- 2 * v_alpha_enh * z_enh_actv / ls_x$enh_rlen
+    }
     psi_enh <- 2 * (v_beta_o_e + ls_x$enh_rlen)
     # Expected values
     expect_open_enh <- get_openness(lambda=lambda_enh, chi=chi_enh, psi=psi_enh, alpha=v_alpha_enh)
@@ -139,8 +146,15 @@ run_variational_bayes <- function(param, ls_x){
     mx_aux <- sweep(sweep(ls_x$contact, 2, exp(z_enh_log_actv), '*'), 1, v_sum_aux, '/')
     # Gamma distribution parameters
     a_enh_actv <- v_alpha_enh + drop(ls_x$rna_count %*% mx_aux)
-    b_enh_actv <- (v_alpha_enh * z_enh_inv_open / ls_x$enh_rlen
-                   + colSums( sweep(ls_x$contact, 1, (ls_x$rna_rlen * z_k * z_pro_actv), '*') ))
+    if(param$no_le_enh){
+      # IVEA_nolE
+      b_enh_actv <- (v_alpha_enh * z_enh_inv_open / 1
+                     + colSums( sweep(ls_x$contact, 1, (ls_x$rna_rlen * z_k * z_pro_actv), '*') ))
+    }else{
+      # IVEA
+      b_enh_actv <- (v_alpha_enh * z_enh_inv_open / ls_x$enh_rlen
+                     + colSums( sweep(ls_x$contact, 1, (ls_x$rna_rlen * z_k * z_pro_actv), '*') ))
+    }
     # Expected values
     z_enh_actv <- a_enh_actv / b_enh_actv
     z_enh_log_actv <- digamma(a_enh_actv) - log(b_enh_actv)
@@ -225,6 +239,7 @@ run_variational_bayes <- function(param, ls_x){
 #'     \item{sp_distance}{sparse matrix (genes x enhancers) of genomic distances.}
 #'   }
 #' @param n_iter Maximum number of iterations
+#' @param no_le_enh Use IVEA_nolE model or not
 #'
 #' @return An initial resultant list object containing the following components:
 #'   \describe{
@@ -238,7 +253,7 @@ run_variational_bayes <- function(param, ls_x){
 #'     \item{pro_log_activity}{matrix of estimated log activities of gene promoters.}
 #'     \item{enh_log_activity}{matrix of estimated log activities of enhancers.}
 #'   }
-make_initial_z <- function(ls_x, n_iter){
+make_initial_z <- function(ls_x, n_iter, no_le_enh){
 
   # Vector and matrix to store estimated values
   v_k <- vector(length=n_iter)
@@ -282,7 +297,13 @@ make_initial_z <- function(ls_x, n_iter){
   ls_z$pro_inv_openness[1,] <- ls_x$pro_rlen / (ls_x$pro_count + 0.01)
   ls_z$enh_inv_openness[1,] <- ls_x$enh_rlen / (ls_x$enh_count + 0.01)
   ls_z$pro_activity[1, ] <- ls_x$pro_count * ls_x$b_size / ls_x$pro_rlen + 0.01
-  ls_z$enh_activity[1, ] <- ls_x$enh_count + 0.01
+  if(no_le_enh){
+    # IVEA_nolE
+    ls_z$enh_activity[1, ] <- ls_x$enh_count / ls_x$enh_rlen + 0.01
+  }else{
+    # IVEA
+    ls_z$enh_activity[1, ] <- ls_x$enh_count + 0.01
+  }
   ls_z$pro_log_activity[1,] <- log(ls_x$pro_count * ls_x$b_size / ls_x$pro_rlen + 0.01)
   ls_z$enh_log_activity[1,] <- log(ls_x$enh_count + 0.01)
 

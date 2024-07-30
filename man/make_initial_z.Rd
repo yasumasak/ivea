@@ -4,7 +4,7 @@
 \alias{make_initial_z}
 \title{Make an initial resultant object}
 \usage{
-make_initial_z(ls_x, n_iter)
+make_initial_z(ls_x, n_iter, no_le_enh)
 }
 \arguments{
 \item{ls_x}{an input-data list object containing the following components:
@@ -30,6 +30,8 @@ make_initial_z(ls_x, n_iter)
 }}
 
 \item{n_iter}{Maximum number of iterations}
+
+\item{no_le_enh}{Use IVEA_nolE model or not}
 }
 \value{
 An initial resultant list object containing the following components:
