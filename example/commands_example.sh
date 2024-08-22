@@ -47,5 +47,6 @@ Rscript ${IVEA_HOME}/scripts/run_IVEA.R \
 --enhancers ./output/enhancer_elements.txt \
 --promoters ./output/gene_promoter_elements.txt \
 --burst_sizes ${IVEA_HOME}/reference/gene_burst_sizes.hg19.txt \
---outdir ./output
+--outdir ./output \
+--no_le_enh FALSE # FALSE performs original IVEA whereas TRUE (default) performs IVEA_nolE.
 
