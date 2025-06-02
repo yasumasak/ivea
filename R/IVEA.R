@@ -46,7 +46,7 @@
 #'
 #' @return A resultant list object containing the following components:
 #'   \describe{
-#'     \item{k}{vector of estimated scaler variable.}
+#'     \item{k}{vector of estimated scaling factor values.}
 #'     \item{pro_openness}{matrix of estimated opennesses of gene promoters.}
 #'     \item{enh_openness}{matrix of estimated opennesses of enhancers.}
 #'     \item{pro_inv_openness}{matrix of estimated 1/opennesses of gene promoters.}
@@ -159,7 +159,7 @@ run_variational_bayes <- function(param, ls_x){
     z_enh_actv <- a_enh_actv / b_enh_actv
     z_enh_log_actv <- digamma(a_enh_actv) - log(b_enh_actv)
 
-    # Update Scaler k ------------------------------
+    # Update Scaling factor k ------------------------------
     # Gamma distribution parameters
     a_k <- alpha_k + sum(ls_x$rna_count)
     b_k <- beta_k + sum(ls_x$rna_rlen * z_pro_actv * (ls_x$contact %*% z_enh_actv))
@@ -171,7 +171,11 @@ run_variational_bayes <- function(param, ls_x){
     ls_z$pro_openness[iter, ] <- z_pro_open
     ls_z$enh_openness[iter, ] <- z_enh_open
     ls_z$pro_activity[iter, ] <- z_pro_actv
+    ls_z$pro_activity_shape[iter, ] <- a_pro_actv
+    ls_z$pro_activity_rate[iter, ] <- b_pro_actv
     ls_z$enh_activity[iter, ] <- z_enh_actv
+    ls_z$enh_activity_shape[iter, ] <- a_enh_actv
+    ls_z$enh_activity_rate[iter, ] <- b_enh_actv
     ls_z$pro_inv_openness[iter, ] <- z_pro_inv_open
     ls_z$enh_inv_openness[iter, ] <- z_enh_inv_open
     ls_z$pro_log_activity[iter, ] <- z_pro_log_actv
@@ -203,7 +207,11 @@ run_variational_bayes <- function(param, ls_x){
   ls_z$pro_openness <- ls_z$pro_openness[1:iter, ]
   ls_z$enh_openness <- ls_z$enh_openness[1:iter, ]
   ls_z$pro_activity <- ls_z$pro_activity[1:iter, ]
+  ls_z$pro_activity_shape <- ls_z$pro_activity_shape[1:iter, ]
+  ls_z$pro_activity_rate <- ls_z$pro_activity_rate[1:iter, ]
   ls_z$enh_activity <- ls_z$enh_activity[1:iter, ]
+  ls_z$enh_activity_shape <- ls_z$enh_activity_shape[1:iter, ]
+  ls_z$enh_activity_rate <- ls_z$enh_activity_rate[1:iter, ]
   ls_z$pro_inv_openness <- ls_z$pro_inv_openness[1:iter, ]
   ls_z$enh_inv_openness <- ls_z$enh_inv_openness[1:iter, ]
   ls_z$pro_log_activity <- ls_z$pro_log_activity[1:iter, ]
@@ -243,7 +251,7 @@ run_variational_bayes <- function(param, ls_x){
 #'
 #' @return An initial resultant list object containing the following components:
 #'   \describe{
-#'     \item{k}{vector of estimated scaler variable.}
+#'     \item{k}{vector of estimated scaling factor values.}
 #'     \item{pro_openness}{matrix of estimated opennesses of gene promoters.}
 #'     \item{enh_openness}{matrix of estimated opennesses of enhancers.}
 #'     \item{pro_inv_openness}{matrix of estimated 1/opennesses of gene promoters.}
@@ -262,7 +270,11 @@ make_initial_z <- function(ls_x, n_iter, no_le_enh){
   pro_inv_openness <- matrix(nrow=n_iter, ncol=ls_x$n_gene)
   enh_inv_openness <- matrix(nrow=n_iter, ncol=ls_x$n_enh)
   pro_activity <- matrix(nrow=n_iter, ncol=ls_x$n_gene)
+  pro_activity_shape <- matrix(nrow=n_iter, ncol=ls_x$n_gene)
+  pro_activity_rate <- matrix(nrow=n_iter, ncol=ls_x$n_gene)
   enh_activity <- matrix(nrow=n_iter, ncol=ls_x$n_enh)
+  enh_activity_shape <- matrix(nrow=n_iter, ncol=ls_x$n_enh)
+  enh_activity_rate <- matrix(nrow=n_iter, ncol=ls_x$n_enh)
   pro_log_activity <- matrix(nrow=n_iter, ncol=ls_x$n_gene)
   enh_log_activity <- matrix(nrow=n_iter, ncol=ls_x$n_enh)
 
@@ -272,7 +284,11 @@ make_initial_z <- function(ls_x, n_iter, no_le_enh){
   colnames(pro_inv_openness) <- ls_x$gene_name
   colnames(enh_inv_openness) <- ls_x$enh_name
   colnames(pro_activity) <- ls_x$gene_name
+  colnames(pro_activity_shape) <- ls_x$gene_name
+  colnames(pro_activity_rate) <- ls_x$gene_name
   colnames(enh_activity) <- ls_x$enh_name
+  colnames(enh_activity_shape) <- ls_x$enh_name
+  colnames(enh_activity_rate) <- ls_x$enh_name
   colnames(pro_log_activity) <- ls_x$gene_name
   colnames(enh_log_activity) <- ls_x$enh_name
 
@@ -283,7 +299,11 @@ make_initial_z <- function(ls_x, n_iter, no_le_enh){
                pro_inv_openness=pro_inv_openness,
                enh_inv_openness=enh_inv_openness,
                pro_activity=pro_activity,
+               pro_activity_shape=pro_activity_shape,
+               pro_activity_rate=pro_activity_rate,
                enh_activity=enh_activity,
+               enh_activity_shape=enh_activity_shape,
+               enh_activity_rate=enh_activity_rate,
                pro_log_activity=pro_log_activity,
                enh_log_activity=enh_log_activity)
 
@@ -339,7 +359,7 @@ make_initial_z <- function(ls_x, n_iter, no_le_enh){
 #'   }
 #' @param ls_z a resultant list object containing the following components:
 #'   \describe{
-#'     \item{k}{vector of estimated scaler variable.}
+#'     \item{k}{vector of estimated scaling factor values.}
 #'     \item{pro_openness}{matrix of estimated opennesses of gene promoters.}
 #'     \item{enh_openness}{matrix of estimated opennesses of enhancers.}
 #'     \item{pro_inv_openness}{matrix of estimated 1/opennesses of gene promoters.}
@@ -361,7 +381,11 @@ make_summary <- function(ls_x, ls_z){
 
   # Estimated element activities
   z_pro_actv <- as.vector(utils::tail(ls_z$pro_activity, n=1))
+  z_pro_actv_shape <- as.vector(utils::tail(ls_z$pro_activity_shape, n=1))
+  z_pro_actv_rate <- as.vector(utils::tail(ls_z$pro_activity_rate, n=1))
   z_enh_actv <- as.vector(utils::tail(ls_z$enh_activity, n=1))
+  z_enh_actv_shape <- as.vector(utils::tail(ls_z$enh_activity_shape, n=1))
+  z_enh_actv_rate <- as.vector(utils::tail(ls_z$enh_activity_rate, n=1))
 
   # Strength / Contribution / Score of enhancer-gene pairs
   mx_contr <- ls_x$contact * (z_pro_actv %*% t(z_enh_actv))
@@ -411,19 +435,41 @@ make_summary <- function(ls_x, ls_z){
 
 
   # Promoter activity in in BED format
+  z_pro_actv_025 <- qgamma(0.025, shape = z_pro_actv_shape, rate = z_pro_actv_rate)
+  z_pro_actv_050 <- qgamma(0.5, shape = z_pro_actv_shape, rate = z_pro_actv_rate)
+  z_pro_actv_975 <- qgamma(0.975, shape = z_pro_actv_shape, rate = z_pro_actv_rate)
+  v_sd_pro_actv <- sqrt(z_pro_actv_shape/(z_pro_actv_rate^2))
   df_bed_pro <- data.frame(p_chr=ls_x$chr,
                            p_start=ls_x$gene_tss-1,
                            p_end=ls_x$gene_tss,
                            name=ls_x$gene_name,
-                           activity=z_pro_actv)
+                           activity=z_pro_actv,
+                           activity_025=z_pro_actv_025,
+                           activity_050=z_pro_actv_050,
+                           activity_975=z_pro_actv_975,
+                           sd_activity=v_sd_pro_actv,
+                           shape=z_pro_actv_shape,
+                           rate=z_pro_actv_rate
+                           )
 
   # Enhancer activity in BED format
   mx_enh <- matrix(unlist(strsplit(ls_x$enh_name, split="[:-]")), ncol=3, byrow=T)
+  z_enh_actv_025 <- qgamma(0.025, shape = z_enh_actv_shape, rate = z_enh_actv_rate)
+  z_enh_actv_050 <- qgamma(0.5, shape = z_enh_actv_shape, rate = z_enh_actv_rate)
+  z_enh_actv_975 <- qgamma(0.975, shape = z_enh_actv_shape, rate = z_enh_actv_rate)
+  v_sd_enh_actv <- sqrt(z_enh_actv_shape/(z_enh_actv_rate^2))
   df_bed_enh <- data.frame(e_chr=mx_enh[, 1],
                            e_start=mx_enh[, 2],
                            e_end=mx_enh[, 3],
                            name=ls_x$enh_name,
-                           activity=z_enh_actv)
+                           activity=z_enh_actv,
+                           activity_025=z_enh_actv_025,
+                           activity_050=z_enh_actv_050,
+                           activity_975=z_enh_actv_975,
+                           sd_activity=v_sd_enh_actv,
+                           shape=z_enh_actv_shape,
+                           rate=z_enh_actv_rate
+                           )
 
   # Order by score
   order_score <- order(df_bedpe_pair$score, decreasing=T)
