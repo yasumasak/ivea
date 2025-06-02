@@ -203,19 +203,15 @@ run_variational_bayes <- function(param, ls_x){
     if(iter %% 10 == 0){ cat(iter," ") } # Keep track of progress
   }
 
-  ls_z$k <- ls_z$k[1:iter]
-  ls_z$pro_openness <- ls_z$pro_openness[1:iter, ]
-  ls_z$enh_openness <- ls_z$enh_openness[1:iter, ]
-  ls_z$pro_activity <- ls_z$pro_activity[1:iter, ]
-  ls_z$pro_activity_shape <- ls_z$pro_activity_shape[1:iter, ]
-  ls_z$pro_activity_rate <- ls_z$pro_activity_rate[1:iter, ]
-  ls_z$enh_activity <- ls_z$enh_activity[1:iter, ]
-  ls_z$enh_activity_shape <- ls_z$enh_activity_shape[1:iter, ]
-  ls_z$enh_activity_rate <- ls_z$enh_activity_rate[1:iter, ]
-  ls_z$pro_inv_openness <- ls_z$pro_inv_openness[1:iter, ]
-  ls_z$enh_inv_openness <- ls_z$enh_inv_openness[1:iter, ]
-  ls_z$pro_log_activity <- ls_z$pro_log_activity[1:iter, ]
-  ls_z$enh_log_activity <- ls_z$enh_log_activity[1:iter, ]
+  # Trim the results
+  ls_z <- lapply(ls_z, function(x) {
+                          if(is.matrix(x)){
+                            return(x[1:iter, ])
+                          }else if(is.vector(x)) {
+                            return(x[1:iter])
+                          }
+                       })
+
   return(ls_z)
 
 }

@@ -233,8 +233,10 @@ Rscript ${IVEA_HOME}/scripts/run_IVEA.R \
 Main outputs:
 * **predictions_score.chr?.bedpe**: Prediction result in BEDPE format (enhancer and gene TSS position, and their interaction score).
 * **predictions_info.chr?.txt**: Prediction result with detailed information: gene (name, chromosome, TSS), promoter (name, read count, length, activity), enhancer (name, read count, length, activity), and regulatory interaction (distance, contact frequency, strength, contribution, score).
-* **estimates.enhancer_activity.chr?.bed**: Estimated enhancer activities in BED format (enhancer position, name and estimated enhancer activity (expected value, 2.5, 50, and 97.5 percentile values, and shape and rate parameters)).
-* **estimates.promoter_activity.chr?.bed**: Estimated promoter activities in BED format (gene TSS, name and estimated promoter activity (expected value, 2.5, 50, and 97.5 percentile values, and shape and rate parameters)).
+* **estimates.enhancer_activity.chr?.bed**: Estimated enhancer activities in BED format (enhancer position, name and estimated enhancer activity).
+* **estimates.promoter_activity.chr?.bed**: Estimated promoter activities in BED format (gene TSS, name and estimated promoter activity).
+* **estimates.enhancer_activity.chr?.txt**: Estimated enhancer activities with details (enhancer position, name and estimated enhancer activity (expected value, 2.5, 50, and 97.5 percentile values, standard deviation, and shape and rate parameters)).
+* **estimates.promoter_activity.chr?.txt**: Estimated promoter activities with details (gene TSS, name and estimated promoter activity (expected value, 2.5, 50, and 97.5 percentile values, standard deviation, and shape and rate parameters)).
 
 
 ## Contact
