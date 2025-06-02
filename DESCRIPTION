@@ -2,7 +2,7 @@ Package: IVEA
 Type: Package
 Title: Integrative variational Bayesian inference of regulatory element activity
     for predicting enhancer–gene regulatory interactions
-Version: 0.1.0
+Version: 1.1.0
 Author: Yasumasa Kimura
 Maintainer: Yasumasa Kimura <kimura.yasumasa.d7@rdn.daiichisankyo.co.jp>
 Imports: 
