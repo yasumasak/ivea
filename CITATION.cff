@@ -1,0 +1,44 @@
+cff-version: 1.2.0
+message: "If you use IVEA, please cite the article listed under 'preferred-citation' (Kimura et al., 2024)."
+title: "IVEA: Integrative variational Bayesian inference of regulatory element activity for predicting enhancer–gene regulatory interactions"
+abstract: "IVEA predicts enhancer–gene regulatory interactions by estimating promoter and enhancer activities via variational Bayesian inference, using cell-type-specific chromatin accessibility (DNase-seq/ATAC-seq), chromatin contact (Hi-C), and gene expression (RNA-seq) data."
+type: software
+authors:
+  - family-names: Kimura
+    given-names: Yasumasa
+    orcid: "https://orcid.org/0000-0001-9173-4509"
+repository-code: "https://github.com/yasumasak/ivea"
+url: "https://github.com/yasumasak/ivea"
+license: MIT
+version: 1.1.0
+date-released: "2025-06-02"
+keywords:
+  - enhancer-gene regulatory interactions
+  - variational Bayesian inference
+  - chromatin accessibility
+  - ATAC-seq
+  - Hi-C
+  - gene regulation
+preferred-citation:
+  type: article
+  title: "IVEA: an integrative variational Bayesian inference method for predicting enhancer–gene regulatory interactions"
+  authors:
+    - family-names: Kimura
+      given-names: Yasumasa
+      orcid: "https://orcid.org/0000-0001-9173-4509"
+    - family-names: Ono
+      given-names: Yoshimasa
+    - family-names: Katayama
+      given-names: Kotoe
+    - family-names: Imoto
+      given-names: Seiya
+  journal: "Bioinformatics Advances"
+  year: 2024
+  volume: 4
+  issue: 1
+  start: vbae118
+  doi: "10.1093/bioadv/vbae118"
+  url: "https://doi.org/10.1093/bioadv/vbae118"
+  issn: "2635-0041"
+  publisher:
+    name: "Oxford University Press"

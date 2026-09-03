@@ -4,6 +4,31 @@
 The IVEA predicts enhancer-gene regulatory interactions by estimating promoter and enhancer activities. This repository contains the scripts to prepare necessary input files as well as the scripts for the inference, and example commands for K562 cell line data set.
 
 
+## Citation
+
+If you use IVEA in your research, please cite:
+
+> Kimura Y, Ono Y, Katayama K, Imoto S. IVEA: an integrative variational Bayesian inference method for predicting enhancer–gene regulatory interactions. *Bioinformatics Advances*. 2024;4(1):vbae118. doi:[10.1093/bioadv/vbae118](https://doi.org/10.1093/bioadv/vbae118)
+
+BibTeX:
+
+```bibtex
+@article{kimura2024ivea,
+  title     = {IVEA: an integrative variational Bayesian inference method for predicting enhancer--gene regulatory interactions},
+  author    = {Kimura, Yasumasa and Ono, Yoshimasa and Katayama, Kotoe and Imoto, Seiya},
+  journal   = {Bioinformatics Advances},
+  volume    = {4},
+  number    = {1},
+  pages     = {vbae118},
+  year      = {2024},
+  doi       = {10.1093/bioadv/vbae118},
+  publisher = {Oxford University Press}
+}
+```
+
+This repository also ships a [`CITATION.cff`](CITATION.cff) file — GitHub renders a **"Cite this repository"** button from it — and an R `inst/CITATION`, so `citation("IVEA")` in R returns the reference above.
+
+
 ## Outline of workflow
 
 The following data are used as input: 
