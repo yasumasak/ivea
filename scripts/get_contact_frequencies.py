@@ -116,10 +116,12 @@ def make_contact_table(chromosome, enh, genes, args):
     enh['enh_midpoint'] = (enh['start'] + enh['end'])/2
     enh['enh_idx'] = enh.index
     genes['gene_idx'] = genes.index
-    enh_pr = df_to_pyranges(enh)
-    genes_pr = df_to_pyranges(genes, start_col = 'target_tss', end_col = 'target_tss', start_slop=args.window, end_slop = args.window)
+    enh_iv = to_intervals(enh)
+    genes_iv = to_intervals(genes, start_col = 'target_tss', end_col = 'target_tss', start_slop=args.window, end_slop = args.window)
 
-    cont = enh_pr.join(genes_pr).df.drop(['Start_b','End_b','chr_b','Chromosome','Start','End'], axis = 1)
+    ovl = bf.overlap(enh_iv, genes_iv, how='inner', cols1=BF_COLS, cols2=BF_COLS, suffixes=('', '_'))
+    cont = ovl.rename(columns={'target_gene_':'target_gene', 'target_tss_':'target_tss', 'gene_idx_':'gene_idx'})\
+              [['chr','start','end','name','class','enh_midpoint','enh_idx','target_gene','target_tss','gene_idx']]
     cont['distance'] = abs(cont['enh_midpoint'] - cont['target_tss'])
     cont = cont.loc[cont['distance'] < args.window,:] #for backwards compatability
 
@@ -158,22 +160,29 @@ def add_hic_to_enh_gene_table(enh, genes, cont, hic_file, hic_norm_file, hic_is_
     # But more generally we do not want to assume constant resolution. In this case HiC should be provided in bedpe format
 
     if args.hic_type == "bedpe":
-        # Use pyranges to compute overlaps between enhancers/genes and hic bedpe table
-        # Consider each range of the hic matrix separately - and merge each range into both enhancers and genes. 
+        # Use bioframe to compute overlaps between enhancers/genes and hic bedpe table
+        # Consider each range of the hic matrix separately - and merge each range into both enhancers and genes.
         # Then remerge on hic index
 
         HiC['hic_idx'] = HiC.index
-        hic1 = df_to_pyranges(HiC, start_col='x1', end_col='x2', chr_col='chr1')
-        hic2 = df_to_pyranges(HiC, start_col='y1', end_col='y2', chr_col='chr2')
+        hic1 = to_intervals(HiC, start_col='x1', end_col='x2', chr_col='chr1')
+        hic2 = to_intervals(HiC, start_col='y1', end_col='y2', chr_col='chr2')
+
+        enh_mid = to_intervals(enh, start_col='enh_midpoint', end_col='enh_midpoint', end_slop=1)
+        genes_tss = to_intervals(genes, start_col='target_tss', end_col='target_tss', end_slop=1)
+
+        def _overlap_hic(left, right):
+            ov = bf.overlap(left, right, how='inner', cols1=BF_COLS, cols2=BF_COLS, suffixes=('', '_'))
+            return ov.rename(columns={'hic_idx_':'hic_idx', 'hic_contact_':'hic_contact'})
 
         # Overlap in one direction
-        enh_hic1 = df_to_pyranges(enh, start_col = 'enh_midpoint', end_col = 'enh_midpoint', end_slop = 1).join(hic1).df
-        genes_hic2 = df_to_pyranges(genes, start_col = 'target_tss', end_col = 'target_tss', end_slop = 1).join(hic2).df
+        enh_hic1 = _overlap_hic(enh_mid, hic1)
+        genes_hic2 = _overlap_hic(genes_tss, hic2)
         ovl12 = enh_hic1[['enh_idx','hic_idx','hic_contact']].merge(genes_hic2[['gene_idx', 'hic_idx']], on = 'hic_idx')
 
         # Overlap in the other direction
-        enh_hic2 = df_to_pyranges(enh, start_col = 'enh_midpoint', end_col = 'enh_midpoint', end_slop = 1).join(hic2).df
-        genes_hic1 = df_to_pyranges(genes, start_col = 'target_tss', end_col = 'target_tss', end_slop = 1).join(hic1).df
+        enh_hic2 = _overlap_hic(enh_mid, hic2)
+        genes_hic1 = _overlap_hic(genes_tss, hic1)
         ovl21 = enh_hic2[['enh_idx','hic_idx','hic_contact']].merge(genes_hic1[['gene_idx', 'hic_idx']], on = ['hic_idx'])
 
         # Concatenate both directions and merge into preditions

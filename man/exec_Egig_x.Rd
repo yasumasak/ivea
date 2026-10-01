@@ -3,7 +3,7 @@
 \name{exec_Egig_x}
 \alias{exec_Egig_x}
 \alias{exec_Egig_inv_x}
-\title{Execute ghyp::Egig}
+\title{Execute the closed-form GIG expectation of \code{x}}
 \usage{
 exec_Egig_x(v)
 
@@ -13,12 +13,14 @@ exec_Egig_inv_x(v)
 \item{v}{numeric vector of parameters for GIG in the form \code{c(lambda, chi, psi)}.}
 }
 \value{
-Expected \code{x} or \code{1/x} from ghyp::Egig
+Expected \code{x} or \code{1/x} of the GIG distribution
 \itemize{
-\item \code{exec_Egig_x} gives expected \code{x} from ghyp::Egig
-\item \code{exec_Egig_inv_x} gives expected \code{1/x} from ghyp::Egig
+\item \code{exec_Egig_x} gives expected \code{x}
+\item \code{exec_Egig_inv_x} gives expected \code{1/x}
 }
 }
 \description{
-Wrapper for \code{ghyp::Egig} to execute through \code{apply} function family.
+Wrapper for \code{egig_x} / \code{egig_inv_x} to execute through \code{apply} function family.
+Returns \code{NA} (rather than a non-finite value) so that \code{get_openness} falls
+back to \code{E_openness} when the closed form is not usable.
 }

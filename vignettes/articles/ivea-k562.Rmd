@@ -1,0 +1,362 @@
+---
+title: "IVEA tutorial: predicting enhancer–gene interactions in K562 (chr22)"
+author: "IVEA"
+output:
+  rmarkdown::html_document:
+    toc: true
+    toc_depth: 2
+    df_print: kable
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 4.5,
+  fig.align = "center",
+  message = FALSE,
+  warning = FALSE
+)
+options(width = 100)
+```
+
+This tutorial runs the full IVEA pipeline on the bundled **K562 chr22** example, inspects the
+predicted promoter/enhancer activities and enhancer–gene interaction scores, and then walks
+through one gene — **TPST2** — to read its predicted regulatory landscape and the *uncertainty*
+IVEA reports for each estimate.
+
+IVEA estimates promoter and enhancer *activities* by variational Bayesian inference and scores
+enhancer–gene regulatory interactions. Method and evaluation: Kimura et al., *Bioinformatics
+Advances* 2024;4(1):vbae118, <https://doi.org/10.1093/bioadv/vbae118>.
+
+```{r libraries}
+library(IVEA)
+library(ggplot2)
+theme_set(theme_minimal(base_size = 12))
+```
+
+The example inputs live outside the installed package, in the source tree (`example/output/`
+and `reference/`). Two working directories occur when this article is rendered: standalone
+`rmarkdown::render()` runs from this file's folder (`vignettes/articles/`), while pkgdown runs
+from the package root. We point `repo` at the root in either case, then build the paths from it.
+
+```{r locate-data}
+repo   <- if (file.exists("DESCRIPTION")) "." else "../.."
+outdir <- file.path(repo, "example", "output")
+stopifnot(dir.exists(outdir))
+```
+
+# 1. Run IVEA on chr22
+
+IVEA's public API is three steps: `load_data()` reads and filters the inputs into the `ls_x`
+data list, `run_variational_bayes()` runs the coordinate-ascent inference, and `make_summary()`
+turns the final estimates into tidy output tables. This is exactly what the command-line driver
+`scripts/run_IVEA.R` does; here we call the functions directly.
+
+We assemble one configuration list whose fields mirror the driver's options (and the settings in
+`example/commands_example.sh`). The scaling hyperparameters `alpha_pro = 80` and `alpha_enh = 10`
+match the example.
+
+```{r config}
+cfg <- list(
+  # Enhancer activity prior model:
+  #   TRUE  -> IVEA_nolE (relative enhancer length dropped from the prior). This is the
+  #            driver default and the better-performing model reported in the paper.
+  #   FALSE -> original IVEA (uses relative enhancer length).
+  no_le_enh = TRUE,
+
+  # Gamma-prior hyperparameters
+  alpha_pro = 80, alpha_enh = 10,
+  alpha_o = 0.01, beta_o = 1e-4,
+  alpha_k = 1e-3, beta_k = 1e-3,
+
+  # Iteration control
+  max_iteration = 500, stop_criterion = 0.005,
+
+  # Chromatin contact
+  contacts = file.path(outdir, "enhancer-gene_contacts.chr22.txt"),
+  hic_contact_colname = NULL,   # use the last (power-law) contact column
+  window = 5e6,
+
+  # Gene expression (RNA-seq)
+  rnas = file.path(outdir, "gene_expressions.txt"),
+  rna_id_colname = "gene_name",
+  rna_length_colname = "effective_length",
+  rna_count_colname = "expected_count",
+  rna_cutoff_colname = "TPM",
+  rna_cutoff_value = 8,
+
+  # Regulatory elements + burst sizes
+  enhancers  = file.path(outdir, "enhancer_elements.txt"),
+  promoters  = file.path(outdir, "gene_promoter_elements.txt"),
+  burst_sizes = file.path(repo, "reference", "gene_burst_sizes.hg19.txt")
+)
+```
+
+**Two models, one switch.** IVEA ships two variants of the enhancer-activity prior, selected by
+`no_le_enh`. `TRUE` gives `IVEA_nolE` (the default, and the model the paper found predicts best);
+`FALSE` gives the original `IVEA`, which also uses each enhancer's relative length. We use the
+recommended `TRUE` here. (The pre-computed files in `example/output/` were generated with
+`FALSE`, so the numbers below will differ slightly from those files — that is expected.)
+
+```{r run, results = "hide"}
+ls_x <- load_data(cfg, "chr22", NULL)
+ls_z <- run_variational_bayes(cfg, ls_x)
+ls_out <- make_summary(ls_x, ls_z)
+```
+
+The inference analysed **`r length(ls_x$gene_name)` genes** and
+**`r length(ls_x$enh_name)` enhancers** on chr22, converging after
+**`r length(ls_z$k) - 1` iterations** (relative change in enhancer activities < `r cfg$stop_criterion`).
+`make_summary()` returns four tables:
+
+- `ls_out$info_pair` — one row per enhancer–gene pair, with the interaction `score` and its
+  components (score-sorted);
+- `ls_out$bedpe_pair` — the same pairs in BEDPE format;
+- `ls_out$bed_pro` / `ls_out$bed_enh` — per-promoter / per-enhancer activity **with uncertainty**
+  (posterior mean, 2.5/50/97.5 percentiles, SD, and Gamma `shape`/`rate`).
+
+# 2. Inspect enhancer activity
+
+`ls_out$bed_enh` holds each enhancer's estimated activity and the uncertainty of that estimate.
+
+```{r enh-head}
+head(ls_out$bed_enh[, c("name", "activity", "activity_025", "activity_975", "sd_activity", "shape", "rate")])
+```
+
+Activities span two–three orders of magnitude, so we view them on a log scale.
+
+```{r enh-hist}
+ggplot(ls_out$bed_enh, aes(activity)) +
+  geom_histogram(bins = 40, fill = "#4C72B0", colour = "white", linewidth = 0.2) +
+  scale_x_log10() +
+  labs(x = "Enhancer activity (log scale)", y = "Number of enhancers",
+       title = "Distribution of estimated enhancer activities (chr22)")
+```
+
+Each activity is the mean of a posterior **Gamma** distribution; the `activity_025`/`activity_975`
+columns are its 2.5/97.5 percentiles and `sd_activity` its standard deviation. We return to what
+drives that uncertainty in section 6.
+
+# 3. Inspect enhancer–gene interactions
+
+`ls_out$info_pair` is sorted by descending `score`. The score combines enhancer activity, chromatin
+contact, and promoter activity; `strength` and `contribution` are intermediate quantities and
+`distance` is the enhancer-to-TSS distance in bp.
+
+```{r pair-head}
+knitr::kable(head(ls_out$info_pair[, c("gene", "enhancer", "distance", "contact", "strength", "contribution", "score")]), row.names = FALSE)
+```
+
+Interaction scores decay with genomic distance — nearby enhancers dominate, with a long tail of
+weaker distal links:
+
+```{r score-vs-distance}
+ggplot(ls_out$info_pair, aes(distance + 1, score)) +
+  geom_point(alpha = 0.5, size = 1.0, colour = "#4C72B0") +
+  scale_x_log10(labels = function(x) paste0(x / 1e3, " kb")) +
+  labs(x = "Enhancer–TSS distance (log scale)", y = "Interaction score",
+       title = "Interaction score decays with distance")
+```
+
+# 4. A worked example: TPST2
+
+We focus on **TPST2**. Its promoter activity (with a 95% credible interval) comes from
+`ls_out$bed_pro`:
+
+```{r tpst2-promoter}
+gene <- "TPST2"
+df_pro <- ls_out$bed_pro[ls_out$bed_pro$name == gene, ]
+knitr::kable(df_pro[, c("name", "p_end", "activity", "activity_025", "activity_975", "sd_activity")], row.names = FALSE)
+```
+
+Its enhancer–gene pairs, ranked by score:
+
+```{r tpst2-pairs}
+df_pair <- ls_out$info_pair[ls_out$info_pair$gene == gene, ]
+df_pair <- df_pair[order(-df_pair$score), ]
+knitr::kable(head(df_pair[, c("enhancer", "distance", "contact", "strength", "score")], 10), row.names = FALSE)
+```
+
+```{r tpst2-coords, echo = FALSE}
+# Parse "chr:start-end" enhancer strings into numeric midpoints for plotting.
+m <- regmatches(df_pair$enhancer, regexec("^(chr[0-9XYM]+):([0-9]+)-([0-9]+)$", df_pair$enhancer))
+df_pair$e_start <- as.numeric(vapply(m, `[`, "", 3))
+df_pair$e_end   <- as.numeric(vapply(m, `[`, "", 4))
+df_pair$e_mid   <- (df_pair$e_start + df_pair$e_end) / 2
+tss <- df_pair$gene_tss[1]
+```
+
+TPST2 has **`r nrow(df_pair)` candidate pairs**; a handful of proximal enhancers carry most of the
+predicted regulatory input, tailing off to weak distal links.
+
+# 5. The predicted regulatory landscape
+
+Before drawing the landscape, we bring in **ground truth**. IVEA bundles a set of
+CRISPRi-validated K562 enhancer–gene pairs under `evaluation_data/`
+(`K562.combined.{positive,negative}.hg19.bedpe`), combining screens from Fulco et al. (2019),
+Gasperini et al. (2019), and Schraivogel et al. (2020): regions where perturbing a candidate
+enhancer did (*positive*) or did not (*negative*) change the target gene's expression. For TPST2
+that panel contains one positive pair and five negatives (all from Gasperini et al. 2019). We read
+them straight from those files, map each validated region to the IVEA enhancer it overlaps, and
+read off that enhancer's rank among TPST2's `r nrow(df_pair)` predicted pairs.
+
+```{r validated-pairs}
+n_top <- 10   # "top 10" throughout this section
+
+# Read the CRISPRi-validated pairs for this gene from the bundled evaluation data.
+# Each file is a headerless 7-column BEDPE: enhancer chr/start/end, TSS chr/start/end, gene.
+read_validated <- function(file, class) {
+  df <- read.table(file.path(repo, "evaluation_data", file), sep = "\t",
+                  col.names = c("chr", "g_start", "g_end", "g_chr", "tss1", "tss2", "gene"))
+  df <- df[df$gene == gene, c("g_start", "g_end")]
+  if (nrow(df) == 0) return(NULL)
+  data.frame(class = class, df)
+}
+df_validated <- rbind(
+  read_validated("K562.combined.positive.hg19.bedpe", "positive"),
+  read_validated("K562.combined.negative.hg19.bedpe", "negative")
+)
+df_validated$g_mid <- (df_validated$g_start + df_validated$g_end) / 2
+
+# Rank TPST2's pairs, then map each validated region to the overlapping IVEA enhancer.
+df_pair$rank <- seq_len(nrow(df_pair))   # df_pair is already sorted by descending score
+map_region <- function(s, e) {
+  hit <- df_pair[df_pair$e_start <= e & df_pair$e_end >= s, ]
+  if (nrow(hit) == 0) return(data.frame(enhancer = NA_character_, rank = NA_integer_, score = NA_real_))
+  hit[which.min(hit$rank), c("enhancer", "rank", "score")]
+}
+df_validated <- cbind(df_validated, do.call(rbind, Map(map_region, df_validated$g_start, df_validated$g_end)))
+df_validated$in_top10 <- !is.na(df_validated$rank) & df_validated$rank <= n_top
+
+knitr::kable(df_validated[, c("class", "g_start", "g_end", "enhancer", "rank", "in_top10")], row.names = FALSE)
+```
+
+The single **positive** maps to a **rank-`r df_validated$rank[df_validated$class == "positive"]`**
+enhancer — comfortably inside the top `r n_top`. Every **negative** falls outside: two map to
+ranks `r paste(sort(df_validated$rank[df_validated$class == "negative"]), collapse = " and ")`, and the
+other three overlap no called enhancer at all. IVEA's ranking therefore separates the validated
+positive from the validated negatives.
+
+We draw the locus as a track: the TSS is marked at the bottom, each enhancer is a lollipop at its
+genomic midpoint with height equal to its interaction score, and an arc connects the TSS to each
+enhancer with width scaled by score. Colour encodes score (a magnitude, so a single sequential
+hue). The enhancer overlapping the CRISPRi-validated **positive** is ringed.
+
+```{r landscape, fig.height = 5}
+df_top <- df_pair[order(-df_pair$score), ][seq_len(min(n_top, nrow(df_pair))), ]
+df_pos_hit <- df_top[df_top$enhancer %in% df_validated$enhancer[df_validated$class == "positive"], ]
+
+ggplot(df_top, aes(x = e_mid / 1e6)) +
+  # arcs TSS -> enhancer, weighted by score
+  geom_curve(aes(x = tss / 1e6, y = 0, xend = e_mid / 1e6, yend = 0, linewidth = score),
+             curvature = -0.2, colour = "#4C72B0", lineend = "round") +
+  # lollipop stems + heads
+  geom_segment(aes(xend = e_mid / 1e6, y = 0, yend = score), colour = "grey70", linewidth = 0.3) +
+  geom_point(aes(y = score, colour = score), size = 2.3) +
+  # ring + label the CRISPRi-validated positive
+  geom_point(data = df_pos_hit, aes(y = score), shape = 21, size = 4.5, stroke = 1.1,
+             colour = "#0072B2", fill = NA) +
+  geom_text(data = df_pos_hit, aes(y = score, label = "CRISPRi +"),
+            vjust = 0.5, hjust = -0.2, size = 3, fontface = "bold", colour = "#0072B2") +
+  # TSS marker
+  geom_point(aes(x = tss / 1e6, y = 0), shape = 17, size = 3, colour = "#C44E52") +
+  annotate("text", x = tss / 1e6, y = 0, label = paste0("  ", gene, " TSS"),
+           hjust = 0, vjust = 1.6, size = 3.4, colour = "#C44E52") +
+  # direct-label the enhancer scores
+  geom_text(data = df_top, aes(y = score, label = sprintf("%.3f", score)),
+            vjust = -0.9, size = 3, colour = "grey20") +
+  scale_colour_viridis_c(option = "D", name = "Score") +
+  scale_linewidth(range = c(0.3, 1.5), guide = "none") +
+  labs(x = "chr22 position (Mb)", y = "Interaction score",
+       title = paste0("Top ", n_top, " predicted regulatory landscape of ", gene)) +
+  theme(panel.grid.minor = element_blank())
+```
+
+The dominant enhancers sit closest to the TSS; the score falls off with distance, matching the
+genome-wide pattern in section 3.
+
+To see the positive and negatives together against the **top-10 cutoff**, we plot every candidate
+enhancer within **1 Mb of the TSS**, coloured by interaction score exactly as in the landscape
+above, and overlay the validated regions. The dashed line is the score of the 10th-ranked pair;
+the CRISPRi-validated positive (ringed, as in the landscape) sits above it, while the negatives
+(crossed) fall below (or at score 0 where no enhancer was called).
+
+```{r validation-plot, fig.height = 4.5}
+thr <- df_top$score[n_top]                              # top-10 score cutoff
+win <- tss + c(-1e6, 1e6)                            # TPST2 TSS +/- 1 Mb
+bg  <- df_pair[df_pair$e_mid >= win[1] & df_pair$e_mid <= win[2], ] # candidate enhancers in that window
+
+df_pos_hit <- df_top[df_top$enhancer %in% df_validated$enhancer[df_validated$class == "positive"], ]
+df_neg <- df_validated[df_validated$class == "negative", ]
+df_neg$plot_score <- ifelse(is.na(df_neg$score), 0, df_neg$score)  # 0 where no enhancer was called
+
+ggplot(bg, aes(e_mid / 1e6, score)) +
+  # candidate enhancers, coloured by interaction score (as in the landscape)
+  geom_point(aes(colour = score), size = 1.7) +
+  geom_hline(yintercept = thr, linetype = "dashed", colour = "grey50") +
+  annotate("text", x = win[1] / 1e6, y = thr, label = "top-10 cutoff",
+           hjust = 0, vjust = -0.5, size = 3, colour = "grey45") +
+  # CRISPRi-validated negatives
+  geom_point(data = df_neg, aes(g_mid / 1e6, plot_score), shape = 4, size = 3, stroke = 1.2,
+             colour = "#D55E00") +
+  # CRISPRi-validated positive: same blue ring + label as the landscape figure
+  geom_point(data = df_pos_hit, aes(e_mid / 1e6, score), shape = 21, size = 4.5, stroke = 1.1,
+             colour = "#0072B2", fill = NA) +
+  geom_text(data = df_pos_hit, aes(e_mid / 1e6, score, label = "CRISPRi +"),
+            vjust = 0.5, hjust = -0.2, size = 3, fontface = "bold", colour = "#0072B2") +
+  # TSS marker
+  annotate("point", x = tss / 1e6, y = 0, shape = 17, size = 3, colour = "#C44E52") +
+  annotate("text", x = tss / 1e6, y = 0, label = paste0("  ", gene, " TSS"),
+           hjust = 0, vjust = 1.6, size = 3.2, colour = "#C44E52") +
+  scale_colour_viridis_c(option = "D", name = "Score") +
+  labs(x = "chr22 position (Mb)", y = "Interaction score",
+       title = "CRISPRi-validated pairs vs predicted score",
+       subtitle = "Positive (ring) clears the top-10 cutoff; negatives (crosses) do not") +
+  theme(panel.grid.minor = element_blank())
+```
+
+# 6. The predicted enhancer activity
+
+Finally we look at the **activity** estimates (not the interaction scores) of the enhancers that
+make up TPST2's top-10 interactions, positioned along the chromosome. Each point is the posterior
+**median** (`activity_050`); the vertical range is the **2.5–97.5 percentile** credible interval
+(`activity_025`–`activity_975`). Colour carries the interaction score, so you can see how activity
+and predicted regulatory role line up across the locus.
+
+```{r activity-position, fig.height = 4.5}
+df_top_enh <- merge(df_top[, c("enhancer", "rank", "score", "e_start", "e_end", "e_mid")],
+                 ls_out$bed_enh[, c("name", "activity_025", "activity_050", "activity_975")],
+                 by.x = "enhancer", by.y = "name")
+df_pos_enh <- df_top_enh[df_top_enh$enhancer %in% df_validated$enhancer[df_validated$class == "positive"], ]
+
+ggplot(df_top_enh, aes(x = e_mid / 1e6)) +
+  geom_vline(xintercept = tss / 1e6, linetype = "dotted", colour = "#C44E52") +
+  annotate("text", x = tss / 1e6, y = max(df_top_enh$activity_975), label = paste0(" ", gene, " TSS"),
+           hjust = 0, size = 3, colour = "#C44E52") +
+  geom_linerange(aes(ymin = activity_025, ymax = activity_975), colour = "grey65", linewidth = 1.5) +
+  geom_point(aes(y = activity_050, colour = score), shape = 15, size = 3) +
+  coord_cartesian(ylim = c(0, max(df_top_enh$activity_975))) +
+  # ring the CRISPRi-validated positive
+  geom_point(data = df_pos_enh, aes(y = activity_050), shape = 21, size = 5.5, stroke = 1.1,
+             colour = "#0072B2", fill = NA) +
+  scale_colour_viridis_c(option = "D", name = "Interaction\nscore") +
+  labs(x = "chr22 position (Mb)",
+       y = "Enhancer activity (2.5–97.5 %ile; point = median)",
+       title = paste0("Enhancer activity across the top-", n_top, " ", gene, " interactions"),
+       subtitle = "Ringed = the CRISPRi-validated positive enhancer") +
+  theme(panel.grid.minor.x = element_blank())
+```
+
+The intervals show that these top enhancers are estimated with differing confidence. Note that
+activity and interaction score need not track each other: the CRISPRi-validated positive has the
+**highest activity** in the panel yet ranks `r df_validated$rank[df_validated$class == "positive"]`,
+because the score weighs activity by chromatin contact — the proximal enhancers rank higher on more
+modest activity thanks to their closeness to the TSS.
+
+# Session information
+
+```{r session, echo = FALSE}
+sessionInfo()
+```

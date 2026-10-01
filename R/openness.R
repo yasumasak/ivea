@@ -1,12 +1,14 @@
 
 #' Get expected openness and 1/openness
 #'
-#' Get expected openness and 1/openness through `ghyp::Egig` and `E_openness` functions.
+#' Get expected openness and 1/openness through the closed-form GIG expectations and `E_openness`.
 #'
 #' @details
-#' `ghyp::Egig` and `E_openness` work for different sets of parameters.
-#' To reduce failures in obtaining expected values,
-#' first execute `ghyp::Egig`, next perform `E_openness` if `ghyp::Egig` failed.
+#' The closed-form generalized inverse Gaussian (GIG) expectations (`egig_x` /
+#' `egig_inv_x`, evaluated with base R `besselK`) and `E_openness` work for
+#' different sets of parameters. To reduce failures in obtaining expected values,
+#' first use the closed-form expectations, next perform `E_openness` if they
+#' return non-finite values.
 #'
 #' @param lambda numeric vector of GIG parameter lambda.
 #' @param chi numeric vector of GIG parameter chi. Must be positive.
@@ -21,32 +23,67 @@
 #'
 #' @export
 get_openness <- function(lambda, chi, psi, alpha){
-  # Parameters for ghyp::Egig
+  # Parameters for the closed-form GIG expectations
   mx1 <- matrix(c(lambda, chi, psi), nrow=3, byrow=TRUE)
-  # Execute ghyp::Egig
-  ghyp_o <- sapply(as.data.frame(mx1), exec_Egig_x)
-  ghyp_inv_o <- sapply(as.data.frame(mx1), exec_Egig_inv_x)
+  # Expected x and 1/x of the GIG distribution
+  gig_o <- sapply(as.data.frame(mx1), exec_Egig_x)
+  gig_inv_o <- sapply(as.data.frame(mx1), exec_Egig_inv_x)
 
   # Parameters for E_openness
-  mx2 <- matrix(c(ghyp_o, ghyp_inv_o, lambda, chi, psi, alpha), nrow=6, byrow=TRUE)
+  mx2 <- matrix(c(gig_o, gig_inv_o, lambda, chi, psi, alpha), nrow=6, byrow=TRUE)
   # Execute E_openness
   sapply(as.data.frame(mx2), exec_E_openness)
 }
 
-#' Execute ghyp::Egig
+#' Closed-form expectations of the generalized inverse Gaussian distribution
 #'
-#' Wrapper for `ghyp::Egig` to execute through `apply` function family.
+#' Expected value of `x` and `1/x` for a variable `x ~ GIG(lambda, chi, psi)`,
+#' evaluated with base R `besselK`. This replaces `ghyp::Egig` so that the
+#' package has no dependency on the `ghyp` package.
+#'
+#' @details
+#' For `x ~ GIG(lambda, chi, psi)` with `w = sqrt(chi * psi)` and the Bessel-K
+#' ratio `R = K_{lambda+1}(w) / K_{lambda}(w)`:
+#' \deqn{E[x]   = sqrt(chi / psi) * R}
+#' \deqn{E[1/x] = sqrt(psi / chi) * R - 2 * lambda / chi}
+#' The ratio `R` is computed with `expon.scaled = TRUE` so that the shared
+#' `exp(-w)` factor cancels, keeping the ratio numerically stable for large `w`.
+#'
+#' @param lambda numeric GIG parameter lambda.
+#' @param chi numeric GIG parameter chi. Must be positive.
+#' @param psi numeric GIG parameter psi. Must be positive.
+#'
+#' @return The expected value of `x` (`egig_x`) or `1/x` (`egig_inv_x`).
+egig_x <- function(lambda, chi, psi){
+  w <- sqrt(chi * psi)
+  r <- besselK(w, lambda + 1, expon.scaled=TRUE) / besselK(w, lambda, expon.scaled=TRUE)
+  sqrt(chi / psi) * r
+}
+
+#' @rdname egig_x
+egig_inv_x <- function(lambda, chi, psi){
+  w <- sqrt(chi * psi)
+  r <- besselK(w, lambda + 1, expon.scaled=TRUE) / besselK(w, lambda, expon.scaled=TRUE)
+  sqrt(psi / chi) * r - 2 * lambda / chi
+}
+
+#' Execute the closed-form GIG expectation of `x`
+#'
+#' Wrapper for `egig_x` / `egig_inv_x` to execute through `apply` function family.
+#' Returns `NA` (rather than a non-finite value) so that `get_openness` falls
+#' back to `E_openness` when the closed form is not usable.
 #'
 #' @param v numeric vector of parameters for GIG in the form `c(lambda, chi, psi)`.
 #'
-#' @return Expected `x` or `1/x` from ghyp::Egig
+#' @return Expected `x` or `1/x` of the GIG distribution
 #'   \itemize{
-#'     \item `exec_Egig_x` gives expected `x` from ghyp::Egig
-#'     \item `exec_Egig_inv_x` gives expected `1/x` from ghyp::Egig
+#'     \item `exec_Egig_x` gives expected `x`
+#'     \item `exec_Egig_inv_x` gives expected `1/x`
 #'   }
 exec_Egig_x <- function(v){
   tryCatch({
-    ghyp::Egig(lambda=v[1], chi=v[2], psi=v[3], func='x')
+    val <- egig_x(lambda=v[1], chi=v[2], psi=v[3])
+    if(!is.finite(val)) NA else val
   }, error=function(e){
     NA
   })
@@ -55,7 +92,8 @@ exec_Egig_x <- function(v){
 #' @rdname exec_Egig_x
 exec_Egig_inv_x <- function(v){
   tryCatch({
-    ghyp::Egig(lambda=v[1], chi=v[2], psi=v[3], func='1/x')
+    val <- egig_inv_x(lambda=v[1], chi=v[2], psi=v[3])
+    if(!is.finite(val)) NA else val
   }, error=function(e){
     NA
   })

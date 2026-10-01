@@ -4,16 +4,16 @@
 \alias{E_openness}
 \title{Calculate expected values of openness and 1/openness}
 \usage{
-E_openness(a, b, c, d)
+E_openness(lambda, chi, psi, alpha)
 }
 \arguments{
-\item{a}{gamma shape parameter.}
+\item{lambda}{numeric vector of GIG parameter lambda.}
 
-\item{b}{gamma rate parameter.}
+\item{chi}{numeric vector of GIG parameter chi. Must be positive.}
 
-\item{c}{inverse-gamma shape parameter.}
+\item{psi}{numeric vector of GIG parameter psi. Must be positive.}
 
-\item{d}{inverse-gamma rate parameter.}
+\item{alpha}{numeric vector of inverse-gamma shape parameter.}
 }
 \value{
 A list object of the following expected values:

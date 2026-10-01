@@ -258,22 +258,24 @@ def annotate_elements(outdir=".",
 
 def assign_element_classes(elements, genes, tss_slop=1000):
 
-    # build pyranges df
-    pr_tss = df_to_pyranges(genes, start_col='tss', end_col='tss', start_slop=tss_slop, end_slop=tss_slop)
-    pr_gene = df_to_pyranges(genes)
+    # build interval frames for bioframe overlap
+    tss_iv = to_intervals(genes, start_col='tss', end_col='tss', start_slop=tss_slop, end_slop=tss_slop)
+    gene_iv = to_intervals(genes)
 
     # label everything as intergenic
     elements['class'] = "intergenic"
     elements['uid'] = range(elements.shape[0])
-    pr_enh = df_to_pyranges(elements)
+    enh_iv = to_intervals(elements)
 
-    # genic element
-    pr_genic_enh = pr_enh.join(pr_gene, suffix="_genic")
-    df_genic_enh = pr_genic_enh.df[['gene_name','uid']].groupby('uid',as_index=False).aggregate(lambda x: ','.join(list(set(x))))
+    # genic element (overlap with gene bodies; gene_name comes from the right frame)
+    genic_enh = bf.overlap(enh_iv, gene_iv, how='inner', cols1=BF_COLS, cols2=BF_COLS, suffixes=('', '_'))
+    df_genic_enh = genic_enh.rename(columns={'gene_name_': 'gene_name'})[['gene_name','uid']]\
+                   .groupby('uid',as_index=False).aggregate(lambda x: ','.join(list(set(x))))
 
-    # promoter element
-    pr_promoter_enh = pr_enh.join(pr_tss, suffix="_promoter")
-    df_promoter_enh = pr_promoter_enh.df[['gene_name','uid']].groupby('uid',as_index=False).aggregate(lambda x: ','.join(list(set(x))))
+    # promoter element (overlap with slopped TSS)
+    promoter_enh = bf.overlap(enh_iv, tss_iv, how='inner', cols1=BF_COLS, cols2=BF_COLS, suffixes=('', '_'))
+    df_promoter_enh = promoter_enh.rename(columns={'gene_name_': 'gene_name'})[['gene_name','uid']]\
+                      .groupby('uid',as_index=False).aggregate(lambda x: ','.join(list(set(x))))
 
     # set class
     elements.loc[elements['uid'].isin(df_genic_enh.uid), 'class'] = "genic"
@@ -297,13 +299,14 @@ def assign_element_classes(elements, genes, tss_slop=1000):
 
 def get_gene_promoter(promoters, genes, tss_slop=1000):
 
-    # build pyranges df
-    pr_tss = df_to_pyranges(genes, start_col='tss', end_col='tss', start_slop=tss_slop, end_slop=tss_slop)
-    pr_pro = df_to_pyranges(promoters)
+    # build interval frames for bioframe overlap
+    tss_iv = to_intervals(genes, start_col='tss', end_col='tss', start_slop=tss_slop, end_slop=tss_slop)
+    pro_iv = to_intervals(promoters)
 
-    # promoters in each gene
-    pr_gene_pro = pr_pro.join(pr_tss, suffix='_gene')
-    df_gene_pro = pr_gene_pro.df[['chr','tss','strand','gene_name','name','length','read_count']].groupby('gene_name', as_index=False)\
+    # promoters in each gene (tss/strand/gene_name come from the right frame)
+    gene_pro = bf.overlap(pro_iv, tss_iv, how='inner', cols1=BF_COLS, cols2=BF_COLS, suffixes=('', '_'))
+    gene_pro = gene_pro.rename(columns={'tss_': 'tss', 'strand_': 'strand', 'gene_name_': 'gene_name'})
+    df_gene_pro = gene_pro[['chr','tss','strand','gene_name','name','length','read_count']].groupby('gene_name', as_index=False)\
                   .aggregate({'chr':['first'], 'tss':['first'], 'strand':['first'], 'name':lambda x: ','.join(list(set(x))), 'length':['sum'], 'read_count':['sum']})
     gene_promoters = df_gene_pro.set_axis(['gene_name','chr','tss','strand','name','length','read_count'], axis='columns')
 

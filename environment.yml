@@ -1,0 +1,33 @@
+name: ivea
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  # Interpreters
+  - python=3.12
+  - r-base>=4.5
+
+  # Python packages
+  - numpy>=2
+  - pandas>=2.2
+  - scipy>=1.13
+  - bioframe>=0.7          # pandas-native genomic interval ops (replaces pyranges)
+
+  # External command-line tools used by scripts/*.py
+  - samtools>=1.20
+  - bedtools>=2.31
+  - macs3                  # peak calling (successor to MACS2; supports Python 3.12)
+  - ucsc-liftover          # lift coordinates between genome assemblies (input preparation)
+
+  # R packages (the IVEA package itself is installed with `R CMD INSTALL`; see README)
+  - r-data.table
+  - r-matrix
+  - r-invgamma
+  - r-optparse
+  - r-testthat            # unit tests (tests/testthat)
+  - r-roxygen2            # regenerate man/*.Rd and NAMESPACE from roxygen comments
+  - r-knitr               # render the K562 tutorial article (vignettes/articles/)
+  - r-rmarkdown           #   "
+  - r-ggplot2             # plots in the tutorial article
+  - r-pkgdown             # build the documentation website (pkgdown::build_site())
+  - pandoc                # rmarkdown -> HTML for the tutorial article and site

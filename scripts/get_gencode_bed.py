@@ -1,7 +1,7 @@
 import argparse
 import pandas as pd
 import os, os.path
-from gtfparse import read_gtf
+from tools import read_gtf_genes
 
 
 def parseargs(required_args=True):
@@ -25,7 +25,7 @@ def main(args):
     os.makedirs(args.outdir, exist_ok=True)
 
     # Load Gencode annotation
-    df_gencode = read_gtf(args.gtf_gencode)
+    df_gencode = read_gtf_genes(args.gtf_gencode)
     # Types to use
     in_type = ['bidirectional_promoter_lncRNA', '3prime_overlapping_ncRNA', 'polymorphic_pseudogene', 'transcribed_unitary_pseudogene', 'TEC', \
         'unitary_pseudogene', 'sense_overlapping', 'transcribed_processed_pseudogene', 'processed_transcript', 'pseudogene', 'sense_intronic', \

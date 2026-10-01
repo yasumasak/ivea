@@ -5,7 +5,7 @@ from scipy import interpolate
 import re
 from subprocess import check_call, check_output, PIPE, Popen, getoutput, CalledProcessError
 import sys
-import pyranges as pr
+import bioframe as bf
 import linecache
 import traceback
 import time
@@ -26,16 +26,52 @@ def print_params(args):
         print("  " + arg + " = " + str(getattr(args, arg)))
 
 
-def df_to_pyranges(df, start_col='start', end_col='end', chr_col='chr', strand_col=None, start_slop=0, end_slop=0):
-    df_pr = df.copy()
-    df_pr['Chromosome'] = df[chr_col]
-    df_pr['Start'] = df[start_col] - start_slop
-    df_pr['Start'] = df_pr['Start'].where(df_pr['Start'] >=0, 0)
-    df_pr['End'] = df[end_col] + end_slop
-    if(strand_col is not None):
-        df_pr['Strand'] = df[strand_col]
+# Interval column names used for bioframe.overlap operations.
+BF_COLS = ('_chrom', '_start', '_end')
 
-    return(pr.PyRanges(df_pr))
+
+def to_intervals(df, start_col='start', end_col='end', chr_col='chr', strand_col=None, start_slop=0, end_slop=0):
+    """Add bioframe interval columns (_chrom/_start/_end) to a copy of `df`.
+
+    Optionally applies slop to both ends and clamps the start at 0. When
+    `strand_col` is given, a normalized `_strand` column is added for
+    strand-aware overlap filtering. All original columns are preserved so that
+    downstream code can select them from a bioframe.overlap() result.
+    Interval bounds are cast to int as required by bioframe.
+    """
+    out = df.copy()
+    out['_chrom'] = df[chr_col].astype(str)
+    start = df[start_col] - start_slop
+    out['_start'] = start.where(start >= 0, 0).astype(int)
+    out['_end'] = (df[end_col] + end_slop).astype(int)
+    if strand_col is not None:
+        out['_strand'] = df[strand_col]
+
+    return out
+
+
+def read_gtf_genes(path):
+    """Read 'gene' feature rows from a (optionally gzipped) GTF file.
+
+    A lightweight, dependency-free replacement for gtfparse.read_gtf covering the
+    columns IVEA uses. Returns a DataFrame with columns: seqname, feature, start,
+    end, strand, gene_id, gene_name, gene_type (1-based GTF coordinates).
+    """
+    gtf_cols = ['seqname', 'source', 'feature', 'start', 'end',
+                'score', 'strand', 'frame', 'attribute']
+    df = pd.read_csv(path, sep='\t', header=None, names=gtf_cols, comment='#',
+                     dtype={'seqname': str}, compression='infer')
+    df = df[df['feature'] == 'gene'].copy()
+
+    def get_attr(name):
+        return df['attribute'].str.extract(r'%s "([^"]*)"' % name, expand=False)
+
+    df['gene_id'] = get_attr('gene_id')
+    df['gene_name'] = get_attr('gene_name')
+    df['gene_type'] = get_attr('gene_type')
+
+    return df[['seqname', 'feature', 'start', 'end', 'strand',
+               'gene_id', 'gene_name', 'gene_type']]
 
 
 def sort_bed(bed_file, sorted_bed_file, genome_sizes, verbose=True):

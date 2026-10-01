@@ -1,0 +1,114 @@
+name: pipeline-e2e
+
+# End-to-end reproducibility check for the full IVEA pipeline (Python
+# preprocessing -> R inference). It complements r-check.yml, which only exercises
+# the R package: nothing else guards that the documented scripts/*.py steps still
+# run and still produce the committed example outputs.
+#
+# The job re-runs the chr22 K562 example from example/commands_example.sh, reading
+# the committed inputs (BAM, MACS narrowPeak, RSEM results, vendored GENCODE GTF,
+# reference/*) and writing into a CLEAN scratch directory, then asserts every
+# regenerated output reproduces the golden fixtures in example/output/ to 6
+# significant figures (scripts/compare_outputs.R, the tolerance used by
+# tests/testthat/test-IVEA.R).
+#
+# Writing into a fresh scratch dir (never example/output/) is deliberate: a step
+# that fails to produce a file leaves it absent, which compare_outputs.R flags as
+# MISSING, rather than silently matching a stale committed file.
+#
+# A failure means either a real regression in a pipeline script OR an upstream
+# numeric change in a dependency (pandas/bioframe/numpy/R). Investigate; if the
+# change is intended, regenerate the fixtures in the same commit (see CLAUDE.md).
+
+on:
+  push:
+    branches: [main]
+    paths: &pipeline_paths
+      - 'scripts/**'
+      - 'R/**'
+      - 'reference/**'
+      - 'example/**'
+      - 'environment.yml'
+      - 'DESCRIPTION'
+      - 'NAMESPACE'
+      - '.github/workflows/pipeline.yml'
+  pull_request:
+    paths: *pipeline_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pipeline-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OUT: ${{ runner.temp }}/ivea-output
+    defaults:
+      run:
+        shell: bash -el {0}   # login shell so the micromamba env auto-activates
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up conda environment (environment.yml)
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          cache-environment: true
+
+      - name: Install the IVEA R package
+        run: R CMD INSTALL --no-multiarch --with-keep.source .
+
+      - name: Run the end-to-end pipeline into a clean scratch directory
+        run: |
+          set -euo pipefail
+          rm -rf "$OUT"; mkdir -p "$OUT"
+
+          # 1. Regulatory elements (reads the committed narrowPeak + BAM)
+          python scripts/get_regulatory_elements.py \
+            --outdir "$OUT" \
+            --narrowPeak example/output/wgEncodeUwDnaseK562AlnMerged.chr22.macs2_peaks.narrowPeak \
+            --bam example/input/wgEncodeUwDnaseK562AlnMerged.chr22.sorted.bam \
+            --chrom_sizes reference/hg19.chrom.sizes \
+            --regions_blacklist reference/wgEncodeHg19ConsensusSignalArtifactRegions.bed \
+            --extension_from_summit 250 \
+            --genes reference/RefSeqCurated.170308.bed.CollapsedGeneBounds.excl_chrY.Fulco_2019.bed \
+            --tss_slop_for_class_assignment 1000 \
+            --n_peaks 3000
+
+          # 2. Contact frequencies (power-law estimate; no Hi-C)
+          python scripts/get_contact_frequencies.py \
+            --enhancers "$OUT/enhancer_elements.txt" \
+            --promoters "$OUT/gene_promoter_elements.txt" \
+            --window 3000000 \
+            --outdir "$OUT" \
+            --chromosomes chr22
+
+          # 3. Gene expression (reads the committed RSEM results + vendored GTF)
+          python scripts/map_gene_expressions.py \
+            --bed_ref reference/RefSeqCurated.170308.bed.CollapsedGeneBounds.excl_chrY.Fulco_2019.bed \
+            --gtf_gencode reference/gencode.v26lift37.annotation.gtf.gz \
+            --rsem example/output/ENCFF001REG-ENCFF001REF_rsem.genes.results \
+            --outdir "$OUT"
+
+          # 4. Variational-Bayes inference (original IVEA; --no_le_enh FALSE matches the fixtures)
+          Rscript scripts/run_IVEA.R \
+            --chr_regions chr22 \
+            --alpha_pro 80 \
+            --alpha_enh 10 \
+            --contacts "$OUT/enhancer-gene_contacts.chr22.txt" \
+            --rnas "$OUT/gene_expressions.txt" \
+            --rna_cutoff_value 8 \
+            --enhancers "$OUT/enhancer_elements.txt" \
+            --promoters "$OUT/gene_promoter_elements.txt" \
+            --burst_sizes reference/gene_burst_sizes.hg19.txt \
+            --outdir "$OUT" \
+            --no_le_enh FALSE
+
+      - name: Compare regenerated outputs against the golden fixtures
+        run: Rscript scripts/compare_outputs.R "$OUT" example/output

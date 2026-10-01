@@ -180,7 +180,7 @@ def get_powerlaw_at_distance(distances, gamma, min_distance=5000, scale=None):
     #The powerlaw is computed for distances > 5kb. We don't know what the contact freq looks like at < 5kb.
     #So just assume that everything at < 5kb is equal to 5kb.
     #TO DO: get more accurate powerlaw at < 5kb
-    distances = np.clip(distances, min_distance, np.Inf)
+    distances = np.clip(distances, min_distance, np.inf)
     log_dists = np.log(distances + 1)
 
     #Determine scale parameter

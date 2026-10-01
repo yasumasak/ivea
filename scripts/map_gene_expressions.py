@@ -2,7 +2,6 @@ import argparse
 import pandas as pd
 import numpy as np
 import os, os.path
-from gtfparse import read_gtf
 from tools import *
 
 def parseargs(required_args=True):
@@ -28,7 +27,7 @@ def load_gencode_rsem(gtf_gencode, rsem):
     df_rsem = pd.read_csv(rsem, sep='\t', header=0).loc[:, ['gene_id', 'effective_length', 'expected_count', 'TPM']]
 
     # Gencode GTF file
-    df_gencode = read_gtf(gtf_gencode)
+    df_gencode = read_gtf_genes(gtf_gencode)
     in_type = ['bidirectional_promoter_lncRNA', '3prime_overlapping_ncRNA', 'polymorphic_pseudogene', 'transcribed_unitary_pseudogene', 'TEC', \
         'unitary_pseudogene', 'sense_overlapping', 'transcribed_processed_pseudogene', 'processed_transcript', 'pseudogene', 'sense_intronic', \
         'transcribed_unprocessed_pseudogene', 'unprocessed_pseudogene', 'antisense', 'lincRNA', 'processed_pseudogene', 'protein_coding']
@@ -64,16 +63,23 @@ def main(args):
     # Remained data
     df_ref_r1 = df_ref[np.logical_not(df_ref['gene_name'].isin(df_merged_1['gene_name']))]
     df_gene_rsem_r1 = df_gene_rsem[np.logical_not(df_gene_rsem['gene_name'].isin(df_merged_1['gene_name']))]
-    # Pyranges for examining overlaps
-    gr_ref_r1 = df_to_pyranges(df_ref_r1, strand_col='strand')
-    gr_gene_rsem_r1 = df_to_pyranges(df_gene_rsem_r1, chr_col='seqname', strand_col='strand')
-    # Join overlapped records
-    df_joined = gr_ref_r1.join(gr_gene_rsem_r1, strandedness='same', report_overlap=True).df
-    # Overlapped fractions
-    frac_overlap = df_joined['Overlap'] / (df_joined['end'] - df_joined['start'])
+    # Interval frames for examining overlaps
+    ref_iv = to_intervals(df_ref_r1, strand_col='strand')
+    gene_iv = to_intervals(df_gene_rsem_r1, chr_col='seqname', strand_col='strand')
+    # Overlap records, reporting the overlap interval
+    ov = bf.overlap(ref_iv, gene_iv, how='inner', cols1=BF_COLS, cols2=BF_COLS,
+                    suffixes=('', '_'), return_overlap=True)
+    # Keep same-strand overlaps only (emulates pyranges strandedness='same')
+    ov = ov[ov['_strand'] == ov['_strand_']].copy()
+    # Overlapped fractions (overlap length over the referential gene's length)
+    overlap_len = ov['overlap__end'] - ov['overlap__start']
+    frac_overlap = overlap_len / (ov['end'] - ov['start'])
 
     # 2. Combined by overlaps --------------------
-    df_merged_2 = df_joined.loc[frac_overlap > 0.9, ['chr', 'start', 'end', 'gene_name', 'strand', 'gene_id', 'effective_length', 'expected_count', 'TPM']]
+    df_merged_2 = ov.loc[frac_overlap > 0.9,
+                         ['chr', 'start', 'end', 'gene_name', 'strand', 'gene_id_', 'effective_length_', 'expected_count_', 'TPM_']]\
+                    .rename(columns={'gene_id_':'gene_id', 'effective_length_':'effective_length',
+                                     'expected_count_':'expected_count', 'TPM_':'TPM'})
 
     # Output file
     pd.concat([df_merged_1, df_merged_2]).drop_duplicates(subset='gene_name', keep=False)\

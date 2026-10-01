@@ -138,11 +138,13 @@ test_that("IVEA_nolE example chr22", {
   df_bedpe_pair <- read.table("../../example/output/predictions_score.chr22.bedpe", sep="\t", header=F)
   df_info_pair <- read.table("../../example/output/predictions_info.chr22.txt", sep="\t", header=T)
 
-  # Score (should be different from the original IVEA result)
-  expect_false(any(signif(ls_out$bedpe_pair[, 8], 6) == signif(df_bedpe_pair[, 8], 6)))
-  # Promoter/Enhancer activity (should be different from the original IVEA result)
-  expect_false(any(signif(ls_out$info_pair[, "promoter_activity"], 6) == signif(df_info_pair[, "promoter_activity"], 6)))
-  expect_false(any(signif(ls_out$info_pair[, "enhancer_activity"], 6) == signif(df_info_pair[, "enhancer_activity"], 6)))
+  # Scores/activities should differ from the original IVEA result for essentially all
+  # pairs. Test the fraction that differ rather than requiring that not a single value
+  # coincides: across ~10^5 pairs a few scores can round to the same 6 significant
+  # figures by chance even though the two models are not equal.
+  expect_gt(mean(signif(ls_out$bedpe_pair[, 8], 6) != signif(df_bedpe_pair[, 8], 6)), 0.99)
+  expect_gt(mean(signif(ls_out$info_pair[, "promoter_activity"], 6) != signif(df_info_pair[, "promoter_activity"], 6)), 0.99)
+  expect_gt(mean(signif(ls_out$info_pair[, "enhancer_activity"], 6) != signif(df_info_pair[, "enhancer_activity"], 6)), 0.99)
 
 })
 

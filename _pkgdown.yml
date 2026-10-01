@@ -1,0 +1,26 @@
+url: https://yasumasak.github.io/ivea/
+
+template:
+  bootstrap: 5
+
+reference:
+- title: Run the pipeline
+  desc: >
+    The three steps of an IVEA analysis, run in order: load and filter the
+    inputs, run the variational-Bayes inference, then summarise the estimates.
+  contents:
+  - load_data
+  - run_variational_bayes
+  - make_summary
+- title: Openness expectations
+  desc: Expected values of the openness latent variables.
+  contents:
+  - get_openness
+  - E_openness
+- title: internal
+  contents:
+  - density_openness
+  - egig_x
+  - exec_E_openness
+  - exec_Egig_x
+  - make_initial_z

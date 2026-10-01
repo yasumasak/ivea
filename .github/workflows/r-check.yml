@@ -1,0 +1,71 @@
+name: R-CMD-check
+
+# Continuous checks for the IVEA R package on R 4.5:
+#   1. R CMD check (package structure, NAMESPACE, Rd docs) on the built tarball.
+#   2. The testthat suite, run from the repository source via test_local().
+#
+# The two are separate on purpose. The integration tests (test-IVEA.R,
+# test-data.R) read the golden fixtures from ../../example/output and
+# ../../reference, which live outside the package tarball by design, so they
+# cannot run inside R CMD check's .Rcheck tree. test_local() loads the package
+# namespace (needed for the internal get_openness() in test-openness.R) and
+# runs the tests from the source tree, where those relative paths resolve.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  R-CMD-check:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.5'
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: |
+            any::rcmdcheck
+            any::pkgload
+          needs: check
+
+      # Package structure / docs / NAMESPACE. Tests are skipped here (run below);
+      # NOTEs are tolerated, WARNINGs and ERRORs fail the job.
+      - name: R CMD check (structure, no tests)
+        run: |
+          rcmdcheck::rcmdcheck(
+            args = c("--no-manual", "--no-tests"),
+            error_on = "warning",
+            check_dir = "check"
+          )
+        shell: Rscript {0}
+
+      # Unit + integration tests against the in-repo golden fixtures.
+      - name: testthat (from source tree)
+        run: |
+          testthat::test_local(".", stop_on_failure = TRUE)
+        shell: Rscript {0}
+
+      - name: Upload check results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r-check-results
+          path: check
+          retention-days: 7

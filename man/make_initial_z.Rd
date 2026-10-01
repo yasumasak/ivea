@@ -36,7 +36,7 @@ make_initial_z(ls_x, n_iter, no_le_enh)
 \value{
 An initial resultant list object containing the following components:
 \describe{
-\item{k}{vector of estimated scaler variable.}
+\item{k}{vector of estimated scaling factor values.}
 \item{pro_openness}{matrix of estimated opennesses of gene promoters.}
 \item{enh_openness}{matrix of estimated opennesses of enhancers.}
 \item{pro_inv_openness}{matrix of estimated 1/opennesses of gene promoters.}

@@ -10,8 +10,8 @@ authors:
 repository-code: "https://github.com/yasumasak/ivea"
 url: "https://github.com/yasumasak/ivea"
 license: MIT
-version: 1.1.0
-date-released: "2025-06-02"
+version: 1.2.0
+date-released: "2026-10-01"
 keywords:
   - enhancer-gene regulatory interactions
   - variational Bayesian inference

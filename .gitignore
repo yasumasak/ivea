@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+
+# pkgdown site (build locally with pkgdown::build_site(); not committed)
+docs/
+
+# Fetched-on-demand reference GTFs (see scripts/fetch_reference.sh).
+# The hg19 gencode.v26lift37 GTF is intentionally vendored and tracked; any
+# fetched GENCODE GTF (native hg38 of any release, or a non-default hg19 lift)
+# is downloaded on demand and must never be committed.
+reference/gencode.v*.annotation.gtf.gz
+!reference/gencode.v26lift37.annotation.gtf.gz

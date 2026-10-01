@@ -69,13 +69,25 @@ def main(args):
     # Load genes' information
     df_gene = get_gene_info(args.genes)
 
-    # Pyranges for examining overlaps
-    gr_promoter = df_to_pyranges(df_gene, start_col='tss', end_col='tss', start_slop=1000, end_slop=1000, strand_col='strand')
-    gr_epd = df_to_pyranges(epd_motif, strand_col='strand')
+    # Interval frames for examining overlaps
+    promoter_iv = to_intervals(df_gene, start_col='tss', end_col='tss', start_slop=1000, end_slop=1000, strand_col='strand')
+    promoter_iv['_pidx'] = np.arange(len(promoter_iv))
+    epd_iv = to_intervals(epd_motif, strand_col='strand')
 
-    # Combine the promoter regions with EPD promoters
-    df_combined = gr_promoter.join(gr_epd, strandedness='same', how='left').df[['chr', 'Start', 'End', 'strand', 'gene_name', 'gene_body_length', 'epd_id', 'TATA-box', 'Inr']]
-    df_combined.replace({'epd_id': {'-1': ''}, 'TATA-box': {-1: 0}, 'Inr': {-1: 0}}, inplace=True)
+    # Same-strand overlaps between the promoter regions and EPD promoters
+    ov = bf.overlap(promoter_iv, epd_iv, how='inner', cols1=BF_COLS, cols2=BF_COLS, suffixes=('', '_'))
+    ov = ov[ov['_strand'] == ov['_strand_']]
+    matched = ov[['_pidx', 'epd_id_', 'TATA-box_', 'Inr_']]\
+              .rename(columns={'epd_id_':'epd_id', 'TATA-box_':'TATA-box', 'Inr_':'Inr'})
+
+    # Left-join back onto every promoter so genes without an EPD match are retained
+    # (emulates pyranges join(strandedness='same', how='left'))
+    base = promoter_iv[['_pidx', 'chr', '_start', '_end', 'strand', 'gene_name', 'gene_body_length']]\
+           .rename(columns={'_start':'Start', '_end':'End'})
+    df_combined = base.merge(matched, on='_pidx', how='left').drop(columns='_pidx')
+    df_combined['epd_id'] = df_combined['epd_id'].fillna('')
+    df_combined['TATA-box'] = df_combined['TATA-box'].fillna(0)
+    df_combined['Inr'] = df_combined['Inr'].fillna(0)
 
     # Calculate burst sizes
     tata = df_combined['TATA-box']

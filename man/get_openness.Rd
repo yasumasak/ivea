@@ -23,10 +23,12 @@ A list object of the following expected values:
 }
 }
 \description{
-Get expected openness and 1/openness through \code{ghyp::Egig} and \code{E_openness} functions.
+Get expected openness and 1/openness through the closed-form GIG expectations and \code{E_openness}.
 }
 \details{
-\code{ghyp::Egig} and \code{E_openness} work for different sets of parameters.
-To reduce failures in obtaining expected values,
-first execute \code{ghyp::Egig}, next perform \code{E_openness} if \code{ghyp::Egig} failed.
+The closed-form generalized inverse Gaussian (GIG) expectations (\code{egig_x} /
+\code{egig_inv_x}, evaluated with base R \code{besselK}) and \code{E_openness} work for
+different sets of parameters. To reduce failures in obtaining expected values,
+first use the closed-form expectations, next perform \code{E_openness} if they
+return non-finite values.
 }

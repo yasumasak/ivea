@@ -2,13 +2,14 @@ Package: IVEA
 Type: Package
 Title: Integrative variational Bayesian inference of regulatory element activity
     for predicting enhancer–gene regulatory interactions
-Version: 1.1.0
+Version: 1.2.0
 Author: Yasumasa Kimura
-Maintainer: Yasumasa Kimura <kimura.yasumasa.d7@rdn.daiichisankyo.co.jp>
-Imports: 
+Maintainer: Yasumasa Kimura <yasumasa.kimura@daiichisankyo.com>
+Depends:
+    R (>= 4.0)
+Imports:
     data.table,
     Matrix,
-    ghyp,
     invgamma,
     methods,
     utils
@@ -16,11 +17,16 @@ Description: IVEA is designed to use cell type-specific transcriptome data and
     functional genomics data of chromatin accessibility and chromatin contact to
     estimate promoter and enhancer activities and calculate enhancer-gene 
     regulatory interaction scores.
+URL: https://github.com/yasumasak/ivea
+BugReports: https://github.com/yasumasak/ivea/issues
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.1
-Suggests: 
-    testthat (>= 3.0.0)
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown,
+    ggplot2
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.0

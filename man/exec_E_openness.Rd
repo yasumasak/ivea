@@ -7,9 +7,9 @@
 exec_E_openness(v)
 }
 \arguments{
-\item{v}{numeric vector in the form \code{c(o, inv_o, a, b, c, d)}.
+\item{v}{numeric vector in the form \code{c(o, inv_o, lambda, chi, psi, alpha)}.
 If both \code{o} and \code{inv_o} are valid, do nothing and return the \code{o} and \code{inv_o}.
-If not, \code{E_openness} is executed with \code{a}, \code{b}, \code{c}, and \code{d} as parameters.}
+If not, \code{E_openness} is executed with \code{lambda}, \code{chi}, \code{psi}, and \code{alpha} as parameters.}
 }
 \value{
 A list object of the following expected values:
