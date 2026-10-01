@@ -47,13 +47,17 @@ jobs:
   pipeline-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      OUT: ${{ runner.temp }}/ivea-output
     defaults:
       run:
         shell: bash -el {0}   # login shell so the micromamba env auto-activates
     steps:
       - uses: actions/checkout@v4
+
+      # A clean scratch dir outside the checkout. $RUNNER_TEMP is a built-in step
+      # env var; the `runner` context is NOT available in a job-level `env:` block,
+      # so OUT is published to $GITHUB_ENV here for the later steps to inherit.
+      - name: Set scratch output directory
+        run: echo "OUT=$RUNNER_TEMP/ivea-output" >> "$GITHUB_ENV"
 
       - name: Set up conda environment (environment.yml)
         uses: mamba-org/setup-micromamba@v2
