@@ -1,12 +1,17 @@
 name: pkgdown
 
 # Builds the pkgdown documentation site (_pkgdown.yml) and, on pushes to main,
-# publishes it to GitHub Pages. The site includes the reference index plus the
-# K562 chr22 tutorial at vignettes/articles/ivea-k562.Rmd, which pkgdown renders
-# LIVE from the source tree: it runs the real variational-Bayes inference against
-# the committed example/output/ fixtures and reference/ files. Those live outside
-# the package tarball (they are .Rbuildignore'd), so the site must be built from
-# the checked-out source, not an installed tarball — which pkgdown does.
+# publishes it to GitHub Pages via the official GitHub Actions Pages pipeline
+# (upload-pages-artifact -> deploy-pages). The built HTML in docs/ is served
+# verbatim — GitHub's Jekyll processor is NOT involved — so there is no gh-pages
+# branch to manage and nothing re-processes pkgdown's output.
+#
+# The site includes the reference index plus the K562 chr22 tutorial at
+# vignettes/articles/ivea-k562.Rmd, which pkgdown renders LIVE from the source
+# tree: it runs the real variational-Bayes inference against the committed
+# example/output/ fixtures and reference/ files. Those live outside the package
+# tarball (they are .Rbuildignore'd), so the site must be built from the
+# checked-out source, not an installed tarball — which pkgdown does.
 #
 # This is an R-only build (library(IVEA) + library(ggplot2)); unlike pipeline.yml
 # it needs none of the Python/MACS3/samtools stack, so it uses the same
@@ -14,9 +19,11 @@ name: pkgdown
 # `local::.` installs IVEA so the article can load it; `needs: website` pulls the
 # Suggests pkgdown requires (knitr, rmarkdown, ggplot2).
 #
-# NOTE: publishing requires GitHub Pages to be enabled for the repository
-# (Settings -> Pages -> Deploy from the gh-pages branch) — a one-time maintainer
-# action. Until then the build still runs and validates the site on every push/PR.
+# ONE-TIME MAINTAINER ACTION: set Settings -> Pages -> Build and deployment ->
+# Source to "GitHub Actions" (NOT "Deploy from a branch"). With the old
+# branch-based setting GitHub runs Jekyll over the deployed files and fails;
+# "GitHub Actions" serves the artifact this workflow uploads. Until that is set,
+# the build job still runs and validates the site on every push/PR.
 
 on:
   push:
@@ -29,19 +36,17 @@ on:
 permissions:
   contents: read
 
-# Only restrict concurrency for non-PR jobs (PRs just build, they do not deploy).
+# Allow one concurrent Pages deployment; don't cancel an in-progress publish.
 concurrency:
-  group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  pkgdown:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 30   # the tutorial article runs the chr22 inference live (~2 min)
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
-    permissions:
-      contents: write   # the deploy step pushes the built site to the gh-pages branch
     steps:
       - uses: actions/checkout@v4
 
@@ -63,10 +68,23 @@ jobs:
         run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
         shell: Rscript {0}
 
-      - name: Deploy to GitHub Pages 🚀
-        if: github.event_name != 'pull_request'
-        uses: JamesIves/github-pages-deploy-action@v4.6.9
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          clean: false
-          branch: gh-pages
-          folder: docs
+          path: docs
+
+  # Publish only for the canonical history, never for PR previews.
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write        # publish to GitHub Pages
+      id-token: write     # OIDC token the deploy-pages action verifies
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages 🚀
+        id: deployment
+        uses: actions/deploy-pages@v4
